@@ -6,7 +6,14 @@ import pandas as pd
 import streamlit as st
 
 
-DB_PATH = os.getenv("IRAN_WAR_DB_PATH", "data/iran_war_tracker.db")
+def resolve_db_path() -> str:
+	raw = os.getenv("IRAN_WAR_DB_PATH", "data/iran_war_tracker.db")
+	cleaned = raw.strip().strip("\"").strip("'")
+	return cleaned or "data/iran_war_tracker.db"
+
+
+DB_PATH = resolve_db_path()
+WAR_START_DATE = date(2026, 2, 28)
 
 METRIC_COLUMNS = {
 	"iranian_civilians_deaths": "Iranian civilians deaths",
@@ -84,6 +91,12 @@ def format_number(value: float | int | None) -> str:
 	return f"{numeric:,.0f}" if numeric.is_integer() else f"{numeric:,.2f}"
 
 
+def get_days_at_war(today: date) -> int:
+	if today < WAR_START_DATE:
+		return 0
+	return (today - WAR_START_DATE).days + 1
+
+
 def render_latest_metrics(metrics_df: pd.DataFrame) -> None:
 	latest = metrics_df.iloc[-1]
 	st.subheader("Latest daily estimates")
@@ -125,6 +138,13 @@ def render_trend_charts(metrics_df: pd.DataFrame) -> None:
 def main() -> None:
 	st.set_page_config(page_title="Iran War Tracker", layout="wide")
 	st.title("Iran War Tracker")
+
+	today = date.today()
+	days_at_war = get_days_at_war(today)
+	top_cols = st.columns(2)
+	top_cols[0].metric("Days at War", f"{days_at_war}")
+	top_cols[1].caption(f"War start date: {WAR_START_DATE.isoformat()}")
+
 	st.caption(
 		"Public read-only dashboard. Data updates are performed by scheduled jobs, not by website users."
 	)
@@ -148,7 +168,7 @@ def main() -> None:
 	render_trend_charts(metrics_df)
 
 	st.subheader("Daily metrics table")
-	st.dataframe(metrics_df, use_container_width=True)
+	st.dataframe(metrics_df, width="stretch")
 
 	st.subheader("Source reputation")
 	try:
@@ -156,7 +176,7 @@ def main() -> None:
 		if sources_df.empty:
 			st.caption("No source history captured yet.")
 		else:
-			st.dataframe(sources_df, use_container_width=True)
+			st.dataframe(sources_df, width="stretch")
 	except Exception as exc:
 		st.warning(f"Could not load source reputation table: {exc}")
 
@@ -166,12 +186,12 @@ def main() -> None:
 		if runs_df.empty:
 			st.caption("No updater run logs yet.")
 		else:
-			st.dataframe(runs_df, use_container_width=True)
+			st.dataframe(runs_df, width="stretch")
 	except Exception as exc:
 		st.warning(f"Could not load updater run logs: {exc}")
 
 	st.divider()
-	st.write("Today:", date.today().isoformat())
+	st.write("Today:", today.isoformat())
 	st.caption("No write actions are exposed in this app.")
 
 

@@ -110,6 +110,12 @@ Required repo secret:
 
 The workflow runs daily and can commit `data/iran_war_tracker.db` changes back to `main`.
 
+## Debug logging
+
+- Local updater runs write logs to `logs/` by default.
+- Override log directory with `IRAN_WAR_LOG_DIR`.
+- GitHub Actions uploads `logs/` as an artifact named `updater-logs-<run_id>` on every run (success or failure).
+
 ## Notes
 
 - Model-derived numbers can be uncertain; review source citations regularly.

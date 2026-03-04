@@ -31,7 +31,99 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           IRAN_WAR_DB_PATH: data/iran_war_tracker.db
           OPENAI_MODEL: gpt-4.1-mini
-        run: python updater.py
+          IRAN_WAR_LOG_DIR: logs
+        run: |
+          set -o pipefail
+          mkdir -p logs
+          python updater.py 2>&1 | tee "logs/updater_${{ github.run_id }}.log"
+
+      - name: Upload updater logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: updater-logs-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Write run summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import os
+          import sqlite3
+          from pathlib import Path
+
+          db_path = Path("data/iran_war_tracker.db")
+          summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
+
+          lines = []
+          lines.append("## Updater Summary")
+
+          if not db_path.exists():
+            lines.append("")
+            lines.append("Database file not found at `data/iran_war_tracker.db`.")
+          else:
+            conn = sqlite3.connect(str(db_path))
+            conn.row_factory = sqlite3.Row
+            try:
+              run_row = conn.execute(
+                """
+                SELECT run_date, started_at, completed_at, status, message
+                FROM updater_runs
+                ORDER BY id DESC
+                LIMIT 1
+                """
+              ).fetchone()
+
+              metric_row = conn.execute(
+                """
+                SELECT
+                  date,
+                  iranian_civilians_deaths,
+                  us_soldiers_deaths,
+                  us_allied_soldiers_deaths,
+                  iranian_soldiers_deaths,
+                  usa_spending_usd
+                FROM daily_metrics
+                ORDER BY date DESC
+                LIMIT 1
+                """
+              ).fetchone()
+
+              lines.append("")
+              if run_row:
+                lines.append(f"- Run date: `{run_row['run_date']}`")
+                lines.append(f"- Status: `{run_row['status']}`")
+                lines.append(f"- Started: `{run_row['started_at']}`")
+                lines.append(f"- Completed: `{run_row['completed_at']}`")
+                lines.append(f"- Message: `{run_row['message']}`")
+              else:
+                lines.append("- No updater run records found.")
+
+              lines.append("")
+              lines.append("### Latest Metrics")
+              lines.append("")
+
+              if metric_row:
+                lines.append(f"- Date: `{metric_row['date']}`")
+                lines.append(f"- Iranian civilians deaths: `{metric_row['iranian_civilians_deaths']}`")
+                lines.append(f"- US soldiers deaths: `{metric_row['us_soldiers_deaths']}`")
+                lines.append(f"- US allied soldiers deaths: `{metric_row['us_allied_soldiers_deaths']}`")
+                lines.append(f"- Iranian soldiers deaths: `{metric_row['iranian_soldiers_deaths']}`")
+                lines.append(f"- USA spending (USD): `{metric_row['usa_spending_usd']}`")
+              else:
+                lines.append("- No daily metrics rows found.")
+
+            finally:
+              conn.close()
+
+          text = "\n".join(lines) + "\n"
+          if summary_file:
+            with open(summary_file, "a", encoding="utf-8") as f:
+              f.write(text)
+          print(text)
+          PY
 
       - name: Commit DB changes
         run: |

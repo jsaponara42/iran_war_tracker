@@ -1,5 +1,6 @@
 import argparse
 import json
+import logging
 import os
 import sqlite3
 from dataclasses import dataclass
@@ -10,9 +11,36 @@ from typing import Any
 from openai import OpenAI
 
 
-DB_PATH = os.getenv("IRAN_WAR_DB_PATH", "data/iran_war_tracker.db")
-MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+def resolve_db_path() -> str:
+    raw = os.getenv("IRAN_WAR_DB_PATH", "data/iran_war_tracker.db")
+    cleaned = raw.strip().strip('"').strip("'")
+    return cleaned or "data/iran_war_tracker.db"
+
+
+DB_PATH = resolve_db_path()
+MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1")
 MAX_REQUESTS = int(os.getenv("UPDATE_MAX_REQUESTS", "10"))
+LOG_DIR = os.getenv("IRAN_WAR_LOG_DIR", "logs")
+
+METRIC_SEARCH_HINTS = {
+    "iranian_civilians_deaths": (
+        "Focus on same-day casualty reports for Iranian civilians from reputable international wire services,"
+        " official humanitarian updates, and major outlets with timestamped reporting."
+    ),
+    "us_soldiers_deaths": (
+        "Focus on same-day reporting from U.S. Department of Defense announcements, major wire services,"
+        " and other official military/public briefings."
+    ),
+    "us_allied_soldiers_deaths": (
+        "Focus on same-day reporting from allied defense ministries, NATO communications, and major wire services."
+    ),
+    "iranian_soldiers_deaths": (
+        "Focus on same-day military casualty reporting from reputable news wires and official statements."
+    ),
+    "usa_spending_usd": (
+        "Focus on same-day reported cumulative U.S. spending estimates from official U.S. sources and trusted finance/government reporting."
+    ),
+}
 
 
 @dataclass
@@ -28,6 +56,33 @@ class MetricResult:
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def configure_logging(target_date: str) -> tuple[logging.Logger, str]:
+    os.makedirs(LOG_DIR, exist_ok=True)
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    safe_date = target_date.replace(":", "-")
+    log_path = os.path.join(LOG_DIR, f"updater_{safe_date}_{timestamp}.log")
+
+    logger = logging.getLogger("iran_war_updater")
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    logger.handlers.clear()
+
+    formatter = logging.Formatter(
+        fmt="%(asctime)s %(levelname)s %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S%z",
+    )
+
+    file_handler = logging.FileHandler(log_path, encoding="utf-8")
+    file_handler.setFormatter(formatter)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+
+    logger.addHandler(file_handler)
+    logger.addHandler(stream_handler)
+    logger.info("Logging initialized. log_path=%s", log_path)
+    return logger, log_path
 
 
 def ensure_db_dir() -> None:
@@ -219,58 +274,68 @@ def call_openai_for_metric(
     previous_value: float | None,
 ) -> MetricResult:
     preferred_domains = get_preferred_domains(conn, metric_name)
+    preferred_domains_text = ", ".join(preferred_domains) if preferred_domains else "none"
+    metric_hint = METRIC_SEARCH_HINTS.get(metric_name, "Use reputable same-day sources.")
 
-    prompt = f"""
+    def fetch_payload(attempt: int) -> tuple[dict[str, Any], list[dict[str, str]], str]:
+        attempt_note = (
+            "First attempt." if attempt == 1 else "Retry attempt because prior result lacked sufficient evidence."
+        )
+
+        prompt = f"""
 You are collecting a single metric for a public war-tracking dataset.
 Metric name: {metric_name}
 Target date: {target_date}
+Preferred reputable domains from prior runs: {preferred_domains_text}
+Metric guidance: {metric_hint}
+Attempt context: {attempt_note}
 
 Requirements:
 1) Use web search and only accept sources published on {target_date}.
 2) If exact same-day data is unavailable, return value_number as null.
-3) Return only JSON object with keys:
+3) Prioritize preferred reputable domains when relevant and available.
+4) Cross-check at least 2 same-day sources before finalizing a numeric estimate.
+5) Return only a JSON object with keys:
    - value_number (number or null)
    - confidence (low|medium|high)
    - rationale (string)
    - source_title (string or null)
    - source_url (string or null)
    - source_date (YYYY-MM-DD or null)
-4) For cumulative metrics, values should not decrease over time.
+6) For cumulative metrics, values should not decrease over time.
    Previous stored value: {previous_value}
-5) No markdown.
+7) No markdown.
 """.strip()
 
-    tools: list[dict[str, Any]] = [{"type": "web_search_preview"}]
-    if preferred_domains:
-        tools = [
-            {
-                "type": "web_search_preview",
-                "domains": preferred_domains,
+        response = client.responses.create(
+            model=MODEL,
+            input=prompt,
+            tools=[{"type": "web_search_preview"}],
+            temperature=0,
+            max_output_tokens=500,
+        )
+
+        text = response.output_text
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            payload = {
+                "value_number": None,
+                "confidence": "low",
+                "rationale": f"Model did not return valid JSON. Raw output: {text[:500]}",
+                "source_title": None,
+                "source_url": None,
+                "source_date": None,
             }
-        ]
 
-    response = client.responses.create(
-        model=MODEL,
-        input=prompt,
-        tools=tools,
-        temperature=0,
-    )
+        citations = _extract_citations(response)
+        return payload, citations, text
 
-    text = response.output_text
-    payload: dict[str, Any]
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        payload = {
-            "value_number": None,
-            "confidence": "low",
-            "rationale": f"Model did not return valid JSON. Raw output: {text[:500]}",
-            "source_title": None,
-            "source_url": None,
-            "source_date": None,
-        }
+    payload, citations, _ = fetch_payload(attempt=1)
+    weak_evidence = (not payload.get("source_url")) and not citations
+    if weak_evidence:
+        payload, citations, _ = fetch_payload(attempt=2)
 
-    citations = _extract_citations(response)
     source_url = payload.get("source_url")
     source_title = payload.get("source_title")
 
@@ -495,20 +560,34 @@ def persist_daily_metrics(
 
 
 def run_update(target_date: str, force: bool = False) -> None:
+    logger, log_path = configure_logging(target_date)
+    logger.info(
+        "Updater start target_date=%s force=%s model=%s db_path=%s",
+        target_date,
+        force,
+        MODEL,
+        DB_PATH,
+    )
+
     if not os.getenv("OPENAI_API_KEY"):
+        logger.error("OPENAI_API_KEY is not set.")
         raise RuntimeError("OPENAI_API_KEY is not set.")
 
     with get_conn() as conn:
         initialize_schema(conn)
+        logger.info("Database schema ensured.")
 
         if not force and already_ran_today(conn, target_date):
+            logger.info("Already ran successfully for %s. Skipping.", target_date)
             print(f"Already ran successfully for {target_date}. Skipping.")
             return
 
         run_id = start_run(conn, target_date)
+        logger.info("Updater run record created run_id=%s", run_id)
         try:
             client = OpenAI()
             previous = get_previous_metrics(conn, target_date)
+            logger.info("Loaded previous metrics snapshot: %s", previous)
 
             fetchers = [
                 fetch_iranian_civilians_deaths,
@@ -526,8 +605,21 @@ def run_update(target_date: str, force: bool = False) -> None:
             results: list[MetricResult] = []
             for fetch_fn in fetchers:
                 metric_name = fetch_fn.__name__.replace("fetch_", "")
+                logger.info(
+                    "Fetching metric=%s previous_value=%s",
+                    metric_name,
+                    previous.get(metric_name),
+                )
                 result = fetch_fn(conn, client, target_date, previous.get(metric_name))
                 results.append(result)
+                logger.info(
+                    "Fetched metric=%s raw_value=%s confidence=%s source_date=%s source_url=%s",
+                    result.metric_name,
+                    result.value,
+                    result.confidence,
+                    result.source_date,
+                    result.source_url,
+                )
 
             values: dict[str, float | None] = {}
             details: dict[str, dict[str, Any]] = {}
@@ -536,6 +628,12 @@ def run_update(target_date: str, force: bool = False) -> None:
                 previous_value = previous.get(result.metric_name)
                 monotonic_value = apply_monotonic_rule(result.value, previous_value)
                 values[result.metric_name] = monotonic_value
+                logger.info(
+                    "Finalized metric=%s final_value=%s previous_value=%s",
+                    result.metric_name,
+                    monotonic_value,
+                    previous_value,
+                )
                 details[result.metric_name] = {
                     "raw_model_value": result.value,
                     "final_value": monotonic_value,
@@ -550,11 +648,15 @@ def run_update(target_date: str, force: bool = False) -> None:
 
             persist_daily_metrics(conn, target_date, values, details)
             finish_run(conn, run_id, "success", "Update completed.")
+            logger.info("Persisted daily metrics and marked run successful.")
             print(f"Update completed successfully for {target_date}.")
 
         except Exception as exc:
             finish_run(conn, run_id, "failed", str(exc))
+            logger.exception("Updater failed: %s", exc)
             raise
+        finally:
+            logger.info("Updater finished. log_path=%s", log_path)
 
 
 def parse_args() -> argparse.Namespace:

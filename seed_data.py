@@ -3,7 +3,13 @@ import sqlite3
 from datetime import date, datetime, timezone
 
 
-DB_PATH = os.getenv("IRAN_WAR_DB_PATH", "data/iran_war_tracker.db")
+def resolve_db_path() -> str:
+    raw = os.getenv("IRAN_WAR_DB_PATH", "data/iran_war_tracker.db")
+    cleaned = raw.strip().strip('"').strip("'")
+    return cleaned or "data/iran_war_tracker.db"
+
+
+DB_PATH = resolve_db_path()
 
 
 def utc_now_iso() -> str:
