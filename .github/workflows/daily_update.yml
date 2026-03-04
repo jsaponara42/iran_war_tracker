@@ -30,7 +30,7 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           IRAN_WAR_DB_PATH: data/iran_war_tracker.db
-          OPENAI_MODEL: gpt-4.1-mini
+          OPENAI_MODEL: gpt-4.1
           IRAN_WAR_LOG_DIR: logs
         run: |
           set -o pipefail
