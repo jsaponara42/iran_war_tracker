@@ -1,0 +1,44 @@
+name: Daily Iran War Update
+
+on:
+  schedule:
+    - cron: "15 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run daily updater
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          IRAN_WAR_DB_PATH: data/iran_war_tracker.db
+          OPENAI_MODEL: gpt-4.1-mini
+        run: python updater.py
+
+      - name: Commit DB changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/iran_war_tracker.db
+          git diff --cached --quiet || git commit -m "chore: daily tracker update"
+
+      - name: Push changes
+        run: git push
