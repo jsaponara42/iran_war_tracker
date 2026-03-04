@@ -26,14 +26,6 @@ def get_readonly_connection() -> sqlite3.Connection:
 	return sqlite3.connect(uri, uri=True)
 
 
-def get_fallback_connection() -> sqlite3.Connection:
-	absolute_path = os.path.abspath(DB_PATH)
-	directory = os.path.dirname(absolute_path)
-	if directory:
-		os.makedirs(directory, exist_ok=True)
-	return sqlite3.connect(absolute_path)
-
-
 def read_daily_metrics() -> pd.DataFrame:
 	query = """
 		SELECT
@@ -48,12 +40,8 @@ def read_daily_metrics() -> pd.DataFrame:
 		FROM daily_metrics
 		ORDER BY date ASC
 	"""
-	try:
-		with get_readonly_connection() as conn:
-			return pd.read_sql_query(query, conn)
-	except sqlite3.OperationalError:
-		with get_fallback_connection() as conn:
-			return pd.read_sql_query(query, conn)
+	with get_readonly_connection() as conn:
+		return pd.read_sql_query(query, conn)
 
 
 def read_source_reputation() -> pd.DataFrame:
@@ -69,12 +57,8 @@ def read_source_reputation() -> pd.DataFrame:
 		FROM metric_sources
 		ORDER BY trust_score DESC, use_count DESC, metric_name ASC
 	"""
-	try:
-		with get_readonly_connection() as conn:
-			return pd.read_sql_query(query, conn)
-	except sqlite3.OperationalError:
-		with get_fallback_connection() as conn:
-			return pd.read_sql_query(query, conn)
+	with get_readonly_connection() as conn:
+		return pd.read_sql_query(query, conn)
 
 
 def read_last_run() -> pd.DataFrame:
@@ -84,12 +68,8 @@ def read_last_run() -> pd.DataFrame:
 		ORDER BY started_at DESC
 		LIMIT 10
 	"""
-	try:
-		with get_readonly_connection() as conn:
-			return pd.read_sql_query(query, conn)
-	except sqlite3.OperationalError:
-		with get_fallback_connection() as conn:
-			return pd.read_sql_query(query, conn)
+	with get_readonly_connection() as conn:
+		return pd.read_sql_query(query, conn)
 
 
 def format_number(value: float | int | None) -> str:
