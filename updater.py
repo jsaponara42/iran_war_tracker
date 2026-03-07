@@ -22,6 +22,22 @@ MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1")
 MAX_REQUESTS = int(os.getenv("UPDATE_MAX_REQUESTS", "20"))
 LOG_DIR = os.getenv("IRAN_WAR_LOG_DIR", "logs")
 
+METRIC_NAMES = [
+    "iranian_civilians_deaths",
+    "us_soldiers_deaths",
+    "us_allied_soldiers_deaths",
+    "iranian_soldiers_deaths",
+    "usa_spending_usd",
+    "schools_hospitals_destroyed",
+    "countries_involved",
+    "civilian_displacement_total",
+    "journalist_casualties",
+    "children_out_of_school",
+    "ceasefire_attempts",
+    "escalation_events",
+    "humanitarian_access_incidents",
+]
+
 METRIC_SEARCH_HINTS = {
     "iranian_civilians_deaths": (
         "Focus on total casualty reports for Iranian civilians from reputable international wire services,"
@@ -241,6 +257,50 @@ def get_previous_metrics(
         }
 
     return dict(row)
+
+
+def get_metrics_for_date(
+    conn: sqlite3.Connection,
+    target_date: str,
+) -> tuple[dict[str, float | None], dict[str, dict[str, Any]]]:
+    row = conn.execute(
+        """
+        SELECT
+            iranian_civilians_deaths,
+            us_soldiers_deaths,
+            us_allied_soldiers_deaths,
+            iranian_soldiers_deaths,
+            usa_spending_usd,
+            schools_hospitals_destroyed,
+            countries_involved,
+            civilian_displacement_total,
+            journalist_casualties,
+            children_out_of_school,
+            ceasefire_attempts,
+            escalation_events,
+            humanitarian_access_incidents,
+            details_json
+        FROM daily_metrics
+        WHERE date = ?
+        LIMIT 1
+        """,
+        (target_date,),
+    ).fetchone()
+
+    if not row:
+        return ({metric: None for metric in METRIC_NAMES}, {})
+
+    values = {metric: row[metric] for metric in METRIC_NAMES}
+    details_raw = row["details_json"]
+    if not details_raw:
+        return values, {}
+
+    try:
+        parsed = json.loads(details_raw)
+        details = parsed if isinstance(parsed, dict) else {}
+    except json.JSONDecodeError:
+        details = {}
+    return values, details
 
 
 def already_ran_today(conn: sqlite3.Connection, target_date: str) -> bool:
@@ -629,6 +689,23 @@ def fetch_humanitarian_access_incidents(
     )
 
 
+METRIC_FETCHERS = {
+    "iranian_civilians_deaths": fetch_iranian_civilians_deaths,
+    "us_soldiers_deaths": fetch_us_soldiers_deaths,
+    "us_allied_soldiers_deaths": fetch_us_allied_soldiers_deaths,
+    "iranian_soldiers_deaths": fetch_iranian_soldiers_deaths,
+    "usa_spending_usd": fetch_usa_spending_usd,
+    "schools_hospitals_destroyed": fetch_schools_hospitals_destroyed,
+    "countries_involved": fetch_countries_involved,
+    "civilian_displacement_total": fetch_civilian_displacement_total,
+    "journalist_casualties": fetch_journalist_casualties,
+    "children_out_of_school": fetch_children_out_of_school,
+    "ceasefire_attempts": fetch_ceasefire_attempts,
+    "escalation_events": fetch_escalation_events,
+    "humanitarian_access_incidents": fetch_humanitarian_access_incidents,
+}
+
+
 def apply_monotonic_rule(new_value: float | None, previous_value: float | None) -> float | None:
     if new_value is None:
         return previous_value
@@ -773,14 +850,20 @@ def persist_daily_metrics(
     conn.commit()
 
 
-def run_update(target_date: str, force: bool = False) -> None:
+def run_update(
+    target_date: str,
+    force: bool = False,
+    selected_metrics: list[str] | None = None,
+) -> None:
     logger, log_path = configure_logging(target_date)
+    selected_metrics = list(dict.fromkeys(selected_metrics or []))
     logger.info(
-        "Updater start target_date=%s force=%s model=%s db_path=%s",
+        "Updater start target_date=%s force=%s model=%s db_path=%s selected_metrics=%s",
         target_date,
         force,
         MODEL,
         DB_PATH,
+        selected_metrics,
     )
 
     if not os.getenv("OPENAI_API_KEY"):
@@ -791,7 +874,7 @@ def run_update(target_date: str, force: bool = False) -> None:
         initialize_schema(conn)
         logger.info("Database schema ensured.")
 
-        if not force and already_ran_today(conn, target_date):
+        if not selected_metrics and not force and already_ran_today(conn, target_date):
             logger.info("Already ran successfully for %s. Skipping.", target_date)
             print(f"Already ran successfully for {target_date}. Skipping.")
             return
@@ -803,21 +886,16 @@ def run_update(target_date: str, force: bool = False) -> None:
             previous = get_previous_metrics(conn, target_date)
             logger.info("Loaded previous metrics snapshot: %s", previous)
 
-            fetchers = [
-                fetch_iranian_civilians_deaths,
-                fetch_us_soldiers_deaths,
-                fetch_us_allied_soldiers_deaths,
-                fetch_iranian_soldiers_deaths,
-                fetch_usa_spending_usd,
-                fetch_schools_hospitals_destroyed,
-                fetch_countries_involved,
-                fetch_civilian_displacement_total,
-                fetch_journalist_casualties,
-                fetch_children_out_of_school,
-                fetch_ceasefire_attempts,
-                fetch_escalation_events,
-                fetch_humanitarian_access_incidents,
-            ]
+            if selected_metrics:
+                unknown_metrics = [m for m in selected_metrics if m not in METRIC_FETCHERS]
+                if unknown_metrics:
+                    raise RuntimeError(f"Unknown metric(s): {', '.join(unknown_metrics)}")
+                metric_run_list = selected_metrics
+            else:
+                metric_run_list = METRIC_NAMES
+
+            fetchers = [METRIC_FETCHERS[m] for m in metric_run_list]
+            logger.info("Running fetchers for metrics=%s", metric_run_list)
 
             if len(fetchers) > MAX_REQUESTS:
                 raise RuntimeError(
@@ -843,8 +921,13 @@ def run_update(target_date: str, force: bool = False) -> None:
                     result.source_url,
                 )
 
-            values: dict[str, float | None] = {}
-            details: dict[str, dict[str, Any]] = {}
+            existing_values, existing_details = get_metrics_for_date(conn, target_date)
+            if any(existing_values.get(metric) is not None for metric in METRIC_NAMES):
+                values: dict[str, float | None] = dict(existing_values)
+                details: dict[str, dict[str, Any]] = dict(existing_details)
+            else:
+                values = dict(previous)
+                details = {}
 
             for result in results:
                 previous_value = previous.get(result.metric_name)
@@ -871,7 +954,13 @@ def run_update(target_date: str, force: bool = False) -> None:
             persist_daily_metrics(conn, target_date, values, details)
             finish_run(conn, run_id, "success", "Update completed.")
             logger.info("Persisted daily metrics and marked run successful.")
-            print(f"Update completed successfully for {target_date}.")
+            if selected_metrics:
+                print(
+                    f"Update completed successfully for {target_date} "
+                    f"(metrics: {', '.join(selected_metrics)})."
+                )
+            else:
+                print(f"Update completed successfully for {target_date}.")
 
         except Exception as exc:
             finish_run(conn, run_id, "failed", str(exc))
@@ -894,9 +983,18 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Force update even if a successful run already exists for the date.",
     )
+    parser.add_argument(
+        "--metric",
+        action="append",
+        choices=METRIC_NAMES,
+        help=(
+            "Run only a specific metric. Can be provided multiple times, "
+            "for example: --metric us_soldiers_deaths --metric countries_involved"
+        ),
+    )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    run_update(target_date=args.target_date, force=args.force)
+    run_update(target_date=args.target_date, force=args.force, selected_metrics=args.metric)

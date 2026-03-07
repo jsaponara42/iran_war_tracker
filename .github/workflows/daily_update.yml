@@ -15,6 +15,11 @@ on:
         required: false
         default: ""
         type: string
+      metric:
+        description: "Optional metric name to rerun only one metric. Leave blank to run all metrics."
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: write
@@ -53,6 +58,9 @@ jobs:
             fi
             if [ -n "${{ inputs.target_date }}" ]; then
               UPDATE_ARGS="$UPDATE_ARGS --date ${{ inputs.target_date }}"
+            fi
+            if [ -n "${{ inputs.metric }}" ]; then
+              UPDATE_ARGS="$UPDATE_ARGS --metric ${{ inputs.metric }}"
             fi
           fi
           python updater.py $UPDATE_ARGS 2>&1 | tee "logs/updater_${{ github.run_id }}.log"
