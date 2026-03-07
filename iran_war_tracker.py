@@ -341,7 +341,7 @@ def main() -> None:
 	)
 
 	st.info(
-		"Data is model-estimated from web sources and may be incomplete. Satire in tone, sourcing in practice."
+		"Data is model-estimated from web sources and may be incomplete. Mostly just to troll Danny."
 	)
 
 	try:
