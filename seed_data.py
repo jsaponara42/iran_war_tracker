@@ -33,6 +33,8 @@ def initialize_schema(conn: sqlite3.Connection) -> None:
             us_allied_soldiers_deaths REAL,
             iranian_soldiers_deaths REAL,
             usa_spending_usd REAL,
+            schools_hospitals_destroyed REAL,
+            countries_involved REAL,
             details_json TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
@@ -59,6 +61,19 @@ def initialize_schema(conn: sqlite3.Connection) -> None:
         );
         """
     )
+
+    existing_columns = {
+        row[1]
+        for row in conn.execute("PRAGMA table_info(daily_metrics)").fetchall()
+    }
+    required_columns: dict[str, str] = {
+        "schools_hospitals_destroyed": "REAL",
+        "countries_involved": "REAL",
+    }
+    for column_name, column_type in required_columns.items():
+        if column_name not in existing_columns:
+            conn.execute(f"ALTER TABLE daily_metrics ADD COLUMN {column_name} {column_type}")
+
     conn.commit()
 
 
@@ -80,10 +95,12 @@ def seed() -> None:
                 us_allied_soldiers_deaths,
                 iranian_soldiers_deaths,
                 usa_spending_usd,
+                schools_hospitals_destroyed,
+                countries_involved,
                 details_json,
                 created_at,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(date) DO NOTHING
             """,
             (
@@ -93,6 +110,8 @@ def seed() -> None:
                 34,
                 980,
                 2500000000,
+                210,
+                9,
                 '{"note":"Seed demo row for dashboard preview."}',
                 now,
                 now,
@@ -105,6 +124,8 @@ def seed() -> None:
             ("us_allied_soldiers_deaths", "https://www.nato.int", "NATO", 0.9),
             ("iranian_soldiers_deaths", "https://www.aljazeera.com", "Al Jazeera", 0.8),
             ("usa_spending_usd", "https://www.cbo.gov", "Congressional Budget Office", 0.95),
+            ("schools_hospitals_destroyed", "https://www.unicef.org", "UNICEF", 0.9),
+            ("countries_involved", "https://www.reuters.com", "Reuters", 0.9),
         ]
 
         for metric_name, source_url, source_title, trust_score in source_rows:

@@ -40,6 +40,14 @@ METRIC_SEARCH_HINTS = {
     "usa_spending_usd": (
         "Focus on same-day reported cumulative U.S. spending estimates from official U.S. sources and trusted finance/government reporting."
     ),
+    "schools_hospitals_destroyed": (
+        "Focus on cumulative counts of schools and hospitals destroyed, damaged beyond use, or rendered non-operational."
+        " Prefer reputable humanitarian, UN, health, and education reporting plus major wire services."
+    ),
+    "countries_involved": (
+        "Focus on total number of countries directly involved (military, active combat, or direct operational support)."
+        " Prefer clear lists from reputable reporting and official statements."
+    ),
 }
 
 
@@ -109,6 +117,8 @@ def initialize_schema(conn: sqlite3.Connection) -> None:
             us_allied_soldiers_deaths REAL,
             iranian_soldiers_deaths REAL,
             usa_spending_usd REAL,
+            schools_hospitals_destroyed REAL,
+            countries_involved REAL,
             details_json TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
@@ -135,6 +145,19 @@ def initialize_schema(conn: sqlite3.Connection) -> None:
         );
         """
     )
+
+    existing_columns = {
+        row[1]
+        for row in conn.execute("PRAGMA table_info(daily_metrics)").fetchall()
+    }
+    required_columns: dict[str, str] = {
+        "schools_hospitals_destroyed": "REAL",
+        "countries_involved": "REAL",
+    }
+    for column_name, column_type in required_columns.items():
+        if column_name not in existing_columns:
+            conn.execute(f"ALTER TABLE daily_metrics ADD COLUMN {column_name} {column_type}")
+
     conn.commit()
 
 
@@ -149,7 +172,9 @@ def get_previous_metrics(
             us_soldiers_deaths,
             us_allied_soldiers_deaths,
             iranian_soldiers_deaths,
-            usa_spending_usd
+            usa_spending_usd,
+            schools_hospitals_destroyed,
+            countries_involved
         FROM daily_metrics
         WHERE date < ?
         ORDER BY date DESC
@@ -165,6 +190,8 @@ def get_previous_metrics(
             "us_allied_soldiers_deaths": None,
             "iranian_soldiers_deaths": None,
             "usa_spending_usd": None,
+            "schools_hospitals_destroyed": None,
+            "countries_involved": None,
         }
 
     return dict(row)
@@ -436,6 +463,36 @@ def fetch_usa_spending_usd(
     )
 
 
+def fetch_schools_hospitals_destroyed(
+    conn: sqlite3.Connection,
+    client: OpenAI,
+    target_date: str,
+    previous_value: float | None,
+) -> MetricResult:
+    return call_openai_for_metric(
+        conn=conn,
+        client=client,
+        metric_name="schools_hospitals_destroyed",
+        target_date=target_date,
+        previous_value=previous_value,
+    )
+
+
+def fetch_countries_involved(
+    conn: sqlite3.Connection,
+    client: OpenAI,
+    target_date: str,
+    previous_value: float | None,
+) -> MetricResult:
+    return call_openai_for_metric(
+        conn=conn,
+        client=client,
+        metric_name="countries_involved",
+        target_date=target_date,
+        previous_value=previous_value,
+    )
+
+
 def apply_monotonic_rule(new_value: float | None, previous_value: float | None) -> float | None:
     if new_value is None:
         return previous_value
@@ -528,16 +585,20 @@ def persist_daily_metrics(
             us_allied_soldiers_deaths,
             iranian_soldiers_deaths,
             usa_spending_usd,
+            schools_hospitals_destroyed,
+            countries_involved,
             details_json,
             created_at,
             updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(date) DO UPDATE SET
             iranian_civilians_deaths = excluded.iranian_civilians_deaths,
             us_soldiers_deaths = excluded.us_soldiers_deaths,
             us_allied_soldiers_deaths = excluded.us_allied_soldiers_deaths,
             iranian_soldiers_deaths = excluded.iranian_soldiers_deaths,
             usa_spending_usd = excluded.usa_spending_usd,
+            schools_hospitals_destroyed = excluded.schools_hospitals_destroyed,
+            countries_involved = excluded.countries_involved,
             details_json = excluded.details_json,
             updated_at = excluded.updated_at
         """,
@@ -548,6 +609,8 @@ def persist_daily_metrics(
             values["us_allied_soldiers_deaths"],
             values["iranian_soldiers_deaths"],
             values["usa_spending_usd"],
+            values["schools_hospitals_destroyed"],
+            values["countries_involved"],
             json.dumps(details),
             now,
             now,
@@ -592,6 +655,8 @@ def run_update(target_date: str, force: bool = False) -> None:
                 fetch_us_allied_soldiers_deaths,
                 fetch_iranian_soldiers_deaths,
                 fetch_usa_spending_usd,
+                fetch_schools_hospitals_destroyed,
+                fetch_countries_involved,
             ]
 
             if len(fetchers) > MAX_REQUESTS:

@@ -21,6 +21,8 @@ METRIC_COLUMNS = {
 	"us_allied_soldiers_deaths": "US allied soldiers deaths",
 	"iranian_soldiers_deaths": "Iranian soldiers deaths",
 	"usa_spending_usd": "USA spending (USD)",
+	"schools_hospitals_destroyed": "Schools & hospitals destroyed",
+	"countries_involved": "Countries involved",
 }
 
 
@@ -42,13 +44,37 @@ def read_daily_metrics() -> pd.DataFrame:
 			us_allied_soldiers_deaths,
 			iranian_soldiers_deaths,
 			usa_spending_usd,
+			schools_hospitals_destroyed,
+			countries_involved,
+			created_at,
+			updated_at
+		FROM daily_metrics
+		ORDER BY date ASC
+	"""
+	legacy_query = """
+		SELECT
+			date,
+			iranian_civilians_deaths,
+			us_soldiers_deaths,
+			us_allied_soldiers_deaths,
+			iranian_soldiers_deaths,
+			usa_spending_usd,
 			created_at,
 			updated_at
 		FROM daily_metrics
 		ORDER BY date ASC
 	"""
 	with get_readonly_connection() as conn:
-		return pd.read_sql_query(query, conn)
+		try:
+			df = pd.read_sql_query(query, conn)
+		except sqlite3.OperationalError:
+			df = pd.read_sql_query(legacy_query, conn)
+
+	for missing_column in ["schools_hospitals_destroyed", "countries_involved"]:
+		if missing_column not in df.columns:
+			df[missing_column] = None
+
+	return df
 
 
 def read_source_reputation() -> pd.DataFrame:
@@ -135,8 +161,8 @@ def render_header(today: date) -> None:
 
 def render_latest_metrics(metrics_df: pd.DataFrame) -> None:
 	latest = metrics_df.iloc[-1]
-	st.subheader("Latest daily estimates")
-	cols = st.columns(5)
+	st.subheader("📊 Latest daily estimates")
+	cols = st.columns(4)
 
 	cols[0].metric(
 		"Iranian civilians",
@@ -154,20 +180,37 @@ def render_latest_metrics(metrics_df: pd.DataFrame) -> None:
 		"Iranian soldiers",
 		format_number(latest["iranian_soldiers_deaths"]),
 	)
-	cols[4].metric(
-		"USA spending (USD)",
+
+	st.metric(
+		"💵 USA spending (USD)",
 		format_number(latest["usa_spending_usd"]),
+	)
+
+	extra_cols = st.columns(2)
+	extra_cols[0].metric(
+		"🏫🏥 Schools & hospitals destroyed",
+		format_number(latest["schools_hospitals_destroyed"]),
+	)
+	extra_cols[1].metric(
+		"🌍 Countries involved",
+		format_number(latest["countries_involved"]),
 	)
 
 	st.caption(f"As of {latest['date']}")
 
 
 def render_trend_charts(metrics_df: pd.DataFrame) -> None:
-	st.subheader("Trend over time")
+	st.subheader("📈 Trend over time")
 	chart_df = metrics_df.copy()
 	chart_df["date"] = pd.to_datetime(chart_df["date"])
 	chart_df = chart_df.set_index("date")
-	chart_df = chart_df[list(METRIC_COLUMNS.keys())].rename(columns=METRIC_COLUMNS)
+	chart_columns = [
+		"iranian_civilians_deaths",
+		"us_soldiers_deaths",
+		"us_allied_soldiers_deaths",
+		"iranian_soldiers_deaths",
+	]
+	chart_df = chart_df[chart_columns].rename(columns=METRIC_COLUMNS)
 	st.line_chart(chart_df)
 
 
@@ -186,7 +229,7 @@ def main() -> None:
 		""",
 		unsafe_allow_html=True,
 	)
-	st.title("Iran War Tracker")
+	st.title("🇮🇷 Iran War Tracker")
 
 	today = date.today()
 	render_header(today)
@@ -196,7 +239,7 @@ def main() -> None:
 	)
 
 	st.info(
-		"Data is model-estimated from web sources and may be incomplete. Always validate against official reporting."
+		"Data is model-estimated from web sources and may be incomplete. And mostly meant to troll Danny."
 	)
 
 	try:
@@ -213,10 +256,10 @@ def main() -> None:
 	render_latest_metrics(metrics_df)
 	render_trend_charts(metrics_df)
 
-	st.subheader("Daily metrics table")
+	st.subheader("🧾 Daily metrics table")
 	st.dataframe(metrics_df, width="stretch")
 
-	st.subheader("Source reputation")
+	st.subheader("🕵️ Source reputation")
 	try:
 		sources_df = read_source_reputation()
 		if sources_df.empty:
@@ -227,7 +270,7 @@ def main() -> None:
 	except Exception as exc:
 		st.warning(f"Could not load source reputation table: {exc}")
 
-	st.subheader("Recent updater runs")
+	st.subheader("🛠️ Recent updater runs")
 	try:
 		runs_df = read_last_run()
 		if runs_df.empty:

@@ -104,7 +104,9 @@ jobs:
                   us_soldiers_deaths,
                   us_allied_soldiers_deaths,
                   iranian_soldiers_deaths,
-                  usa_spending_usd
+                  usa_spending_usd,
+                  schools_hospitals_destroyed,
+                  countries_involved
                 FROM daily_metrics
                 ORDER BY date DESC
                 LIMIT 1
@@ -132,6 +134,8 @@ jobs:
                 lines.append(f"- US allied soldiers deaths: `{metric_row['us_allied_soldiers_deaths']}`")
                 lines.append(f"- Iranian soldiers deaths: `{metric_row['iranian_soldiers_deaths']}`")
                 lines.append(f"- USA spending (USD): `{metric_row['usa_spending_usd']}`")
+                lines.append(f"- Schools & hospitals destroyed: `{metric_row['schools_hospitals_destroyed']}`")
+                lines.append(f"- Countries involved: `{metric_row['countries_involved']}`")
               else:
                 lines.append("- No daily metrics rows found.")
 

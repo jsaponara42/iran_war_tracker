@@ -11,6 +11,8 @@ The updater writes one daily record to SQLite with these cumulative metrics:
 - `us_allied_soldiers_deaths`
 - `iranian_soldiers_deaths`
 - `usa_spending_usd`
+- `schools_hospitals_destroyed`
+- `countries_involved`
 
 For each metric, the updater uses OpenAI Responses API with the built-in web search tool and provides the target date in the prompt. It also stores source metadata and reputation signals.
 
