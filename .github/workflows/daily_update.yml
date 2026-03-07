@@ -106,7 +106,13 @@ jobs:
                   iranian_soldiers_deaths,
                   usa_spending_usd,
                   schools_hospitals_destroyed,
-                  countries_involved
+                  countries_involved,
+                  civilian_displacement_total,
+                  journalist_casualties,
+                  children_out_of_school,
+                  ceasefire_attempts,
+                  escalation_events,
+                  humanitarian_access_incidents
                 FROM daily_metrics
                 ORDER BY date DESC
                 LIMIT 1
@@ -136,6 +142,12 @@ jobs:
                 lines.append(f"- USA spending (USD): `{metric_row['usa_spending_usd']}`")
                 lines.append(f"- Schools & hospitals destroyed: `{metric_row['schools_hospitals_destroyed']}`")
                 lines.append(f"- Countries involved: `{metric_row['countries_involved']}`")
+                lines.append(f"- Civilian displacement: `{metric_row['civilian_displacement_total']}`")
+                lines.append(f"- Journalist casualties: `{metric_row['journalist_casualties']}`")
+                lines.append(f"- Children out of school: `{metric_row['children_out_of_school']}`")
+                lines.append(f"- Ceasefire attempts: `{metric_row['ceasefire_attempts']}`")
+                lines.append(f"- Escalation events: `{metric_row['escalation_events']}`")
+                lines.append(f"- Humanitarian access incidents: `{metric_row['humanitarian_access_incidents']}`")
               else:
                 lines.append("- No daily metrics rows found.")
 

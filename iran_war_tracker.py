@@ -14,6 +14,11 @@ def resolve_db_path() -> str:
 
 DB_PATH = resolve_db_path()
 WAR_START_DATE = date(2026, 2, 28)
+MEAL_COST_USD = 3.5
+CLASSROOM_COST_USD = 250000
+TRAUMA_CENTER_COST_USD = 15000000
+SCHOLARSHIP_COST_USD = 40000
+NURSE_SALARY_USD = 85000
 
 METRIC_COLUMNS = {
 	"iranian_civilians_deaths": "Iranian civilians deaths",
@@ -23,6 +28,12 @@ METRIC_COLUMNS = {
 	"usa_spending_usd": "USA spending (USD)",
 	"schools_hospitals_destroyed": "Schools & hospitals destroyed",
 	"countries_involved": "Countries involved",
+	"civilian_displacement_total": "Civilian displacement",
+	"journalist_casualties": "Journalist casualties",
+	"children_out_of_school": "Children out of school",
+	"ceasefire_attempts": "Ceasefire attempts",
+	"escalation_events": "Escalation events",
+	"humanitarian_access_incidents": "Humanitarian access incidents",
 }
 
 
@@ -46,6 +57,12 @@ def read_daily_metrics() -> pd.DataFrame:
 			usa_spending_usd,
 			schools_hospitals_destroyed,
 			countries_involved,
+			civilian_displacement_total,
+			journalist_casualties,
+			children_out_of_school,
+			ceasefire_attempts,
+			escalation_events,
+			humanitarian_access_incidents,
 			created_at,
 			updated_at
 		FROM daily_metrics
@@ -70,7 +87,16 @@ def read_daily_metrics() -> pd.DataFrame:
 		except sqlite3.OperationalError:
 			df = pd.read_sql_query(legacy_query, conn)
 
-	for missing_column in ["schools_hospitals_destroyed", "countries_involved"]:
+	for missing_column in [
+		"schools_hospitals_destroyed",
+		"countries_involved",
+		"civilian_displacement_total",
+		"journalist_casualties",
+		"children_out_of_school",
+		"ceasefire_attempts",
+		"escalation_events",
+		"humanitarian_access_incidents",
+	]:
 		if missing_column not in df.columns:
 			df[missing_column] = None
 
@@ -148,6 +174,77 @@ def add_source_freshness_columns(sources_df: pd.DataFrame, today: date) -> pd.Da
 	return formatted_df
 
 
+def to_int_or_zero(value: float | int | None) -> int:
+	if value is None or pd.isna(value):
+		return 0
+	try:
+		return int(float(value))
+	except (TypeError, ValueError):
+		return 0
+
+
+def render_opportunity_cost(latest: pd.Series) -> None:
+	spending = float(latest.get("usa_spending_usd") or 0)
+	meals = int(spending / MEAL_COST_USD)
+	classrooms = int(spending / CLASSROOM_COST_USD)
+	trauma_centers = int(spending / TRAUMA_CENTER_COST_USD)
+	scholarships = int(spending / SCHOLARSHIP_COST_USD)
+	nurse_years = int(spending / NURSE_SALARY_USD)
+
+	st.subheader("💸 Opportunity Cost of the Day")
+	st.caption("Satirical framing, real arithmetic.")
+
+	cols = st.columns(5)
+	cols[0].metric("🍽️ School meals", f"{meals:,}")
+	cols[1].metric("🏫 Classrooms funded", f"{classrooms:,}")
+	cols[2].metric("🏥 Trauma centers", f"{trauma_centers:,}")
+	cols[3].metric("🎓 Scholarships", f"{scholarships:,}")
+	cols[4].metric("🩺 Nurse salary-years", f"{nurse_years:,}")
+
+	st.info(
+		f"Counterfactual ticker: ${spending:,.0f} in conflict spending equals roughly "
+		f"{meals:,} school meals or {scholarships:,} scholarships."
+	)
+
+
+def render_diplomacy_scoreboard(latest: pd.Series) -> None:
+	ceasefires = to_int_or_zero(latest.get("ceasefire_attempts"))
+	escalations = to_int_or_zero(latest.get("escalation_events"))
+	access_incidents = to_int_or_zero(latest.get("humanitarian_access_incidents"))
+
+	st.subheader("🕊️ Diplomacy Scoreboard")
+	cols = st.columns(3)
+	cols[0].metric("Ceasefire attempts", f"{ceasefires:,}")
+	cols[1].metric("Escalation events", f"{escalations:,}")
+	cols[2].metric("Access denials/incidents", f"{access_incidents:,}")
+
+	if escalations > ceasefires:
+		st.warning("Spin detector: escalation outpaces diplomacy. Strategic messaging may exceed strategic results.")
+	else:
+		st.success("Spin detector: diplomacy signals are keeping pace with escalation signals.")
+
+
+def render_humanitarian_impact(latest: pd.Series) -> None:
+	st.subheader("🧯 Humanitarian Impact")
+	cols = st.columns(4)
+	cols[0].metric("🧳 Displaced civilians", format_number(latest.get("civilian_displacement_total")))
+	cols[1].metric("🧒 Children out of school", format_number(latest.get("children_out_of_school")))
+	cols[2].metric("📰 Journalist casualties", format_number(latest.get("journalist_casualties")))
+	cols[3].metric("🏫🏥 Schools & hospitals destroyed", format_number(latest.get("schools_hospitals_destroyed")))
+
+
+def render_methodology() -> None:
+	with st.expander("🔎 Methodology and reliability notes"):
+		st.markdown(
+			"""
+- Data is model-assisted and source-linked; treat as estimates, not official counts.
+- Cumulative metrics are monotonic and never decrease once recorded.
+- Updater prioritizes recency and verification, then selects highest verifiable cumulative values.
+- Opportunity-cost cards are arithmetic transformations of USA spending with fixed assumptions.
+"""
+		)
+
+
 def render_header(today: date) -> None:
 	days_at_war = get_days_at_war(today)
 	top_cols = st.columns(2)
@@ -157,6 +254,7 @@ def render_header(today: date) -> None:
 	with st.container(border=True):
 		st.subheader("Number of Hearts and Minds Won")
 		st.markdown("## 0")
+		st.caption("War ROI dashboard: still waiting for positive externalities.")
 
 
 def render_latest_metrics(metrics_df: pd.DataFrame) -> None:
@@ -213,12 +311,29 @@ def render_trend_charts(metrics_df: pd.DataFrame) -> None:
 	chart_df = chart_df[chart_columns].rename(columns=METRIC_COLUMNS)
 	st.line_chart(chart_df)
 
+	humanitarian_columns = [
+		"civilian_displacement_total",
+		"children_out_of_school",
+		"journalist_casualties",
+		"humanitarian_access_incidents",
+	]
+	humanitarian_df = metrics_df.copy()
+	humanitarian_df["date"] = pd.to_datetime(humanitarian_df["date"])
+	humanitarian_df = humanitarian_df.set_index("date")
+	humanitarian_df = humanitarian_df[humanitarian_columns].rename(columns=METRIC_COLUMNS)
+	st.subheader("📉 Humanitarian trendlines")
+	st.line_chart(humanitarian_df)
+
 
 def main() -> None:
 	st.set_page_config(page_title="Iran War Tracker", layout="wide")
 	st.markdown(
 		"""
 		<style>
+		.stApp {
+			background: radial-gradient(circle at top right, rgba(255, 210, 120, 0.08), transparent 35%),
+			            radial-gradient(circle at top left, rgba(180, 220, 255, 0.08), transparent 40%);
+		}
 		div[data-testid="stMetric"] {
 			border: 1px solid color-mix(in srgb, var(--text-color) 15%, transparent);
 			border-radius: 10px;
@@ -239,7 +354,7 @@ def main() -> None:
 	)
 
 	st.info(
-		"Data is model-estimated from web sources and may be incomplete. And mostly meant to troll Danny."
+		"Data is model-estimated from web sources and may be incomplete. Satire in tone, sourcing in practice."
 	)
 
 	try:
@@ -255,6 +370,9 @@ def main() -> None:
 
 	render_latest_metrics(metrics_df)
 	render_trend_charts(metrics_df)
+	render_humanitarian_impact(metrics_df.iloc[-1])
+	render_diplomacy_scoreboard(metrics_df.iloc[-1])
+	render_opportunity_cost(metrics_df.iloc[-1])
 
 	st.subheader("🧾 Daily metrics table")
 	st.dataframe(metrics_df, width="stretch")
@@ -266,6 +384,9 @@ def main() -> None:
 			st.caption("No source history captured yet.")
 		else:
 			sources_df = add_source_freshness_columns(sources_df, today)
+			staleness_count = (sources_df["source_freshness"].isin(["aging", "stale"])) .sum()
+			if staleness_count > 0:
+				st.warning(f"Staleness alarm: {int(staleness_count)} tracked source records are aging or stale.")
 			st.dataframe(sources_df, width="stretch")
 	except Exception as exc:
 		st.warning(f"Could not load source reputation table: {exc}")
@@ -281,6 +402,7 @@ def main() -> None:
 		st.warning(f"Could not load updater run logs: {exc}")
 
 	st.divider()
+	render_methodology()
 	st.write("Today:", today.isoformat())
 	st.caption("No write actions are exposed in this app.")
 

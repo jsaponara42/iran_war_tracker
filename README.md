@@ -13,8 +13,16 @@ The updater writes one daily record to SQLite with these cumulative metrics:
 - `usa_spending_usd`
 - `schools_hospitals_destroyed`
 - `countries_involved`
+- `civilian_displacement_total`
+- `journalist_casualties`
+- `children_out_of_school`
+- `ceasefire_attempts`
+- `escalation_events`
+- `humanitarian_access_incidents`
 
 For each metric, the updater uses OpenAI Responses API with the built-in web search tool and provides the target date in the prompt. It also stores source metadata and reputation signals.
+
+The dashboard also computes satirical opportunity-cost counters from spending (meals, classrooms, trauma centers, scholarships, nurse salary-years) and diplomacy framing cards (ceasefire attempts vs escalations).
 
 ## Security model
 

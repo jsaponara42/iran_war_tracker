@@ -19,7 +19,7 @@ def resolve_db_path() -> str:
 
 DB_PATH = resolve_db_path()
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1")
-MAX_REQUESTS = int(os.getenv("UPDATE_MAX_REQUESTS", "10"))
+MAX_REQUESTS = int(os.getenv("UPDATE_MAX_REQUESTS", "20"))
 LOG_DIR = os.getenv("IRAN_WAR_LOG_DIR", "logs")
 
 METRIC_SEARCH_HINTS = {
@@ -47,6 +47,28 @@ METRIC_SEARCH_HINTS = {
     "countries_involved": (
         "Focus on total number of countries directly involved (military, active combat, or direct operational support)."
         " Prefer clear lists from reputable reporting and official statements."
+    ),
+    "civilian_displacement_total": (
+        "Focus on total people displaced by the conflict to date."
+        " Prioritize UN/OCHA/UNHCR and major wire reporting with clear cumulative estimates."
+    ),
+    "journalist_casualties": (
+        "Focus on total journalists killed or severely injured in relation to the conflict."
+        " Prioritize press freedom organizations and major verified reporting."
+    ),
+    "children_out_of_school": (
+        "Focus on cumulative count of children whose schooling is disrupted or out of school due to conflict impacts."
+        " Prioritize UNICEF/UNESCO/education cluster and major verified reporting."
+    ),
+    "ceasefire_attempts": (
+        "Focus on total count of documented ceasefire proposals, talks, or formal attempts to date."
+    ),
+    "escalation_events": (
+        "Focus on cumulative count of major escalation events (major strikes, new offensives, notable expansion in military scope)."
+    ),
+    "humanitarian_access_incidents": (
+        "Focus on cumulative count of reported humanitarian access denials/incidents."
+        " Prioritize OCHA/aid organizations and major verified reporting."
     ),
 }
 
@@ -119,6 +141,12 @@ def initialize_schema(conn: sqlite3.Connection) -> None:
             usa_spending_usd REAL,
             schools_hospitals_destroyed REAL,
             countries_involved REAL,
+            civilian_displacement_total REAL,
+            journalist_casualties REAL,
+            children_out_of_school REAL,
+            ceasefire_attempts REAL,
+            escalation_events REAL,
+            humanitarian_access_incidents REAL,
             details_json TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
@@ -153,6 +181,12 @@ def initialize_schema(conn: sqlite3.Connection) -> None:
     required_columns: dict[str, str] = {
         "schools_hospitals_destroyed": "REAL",
         "countries_involved": "REAL",
+        "civilian_displacement_total": "REAL",
+        "journalist_casualties": "REAL",
+        "children_out_of_school": "REAL",
+        "ceasefire_attempts": "REAL",
+        "escalation_events": "REAL",
+        "humanitarian_access_incidents": "REAL",
     }
     for column_name, column_type in required_columns.items():
         if column_name not in existing_columns:
@@ -174,7 +208,13 @@ def get_previous_metrics(
             iranian_soldiers_deaths,
             usa_spending_usd,
             schools_hospitals_destroyed,
-            countries_involved
+            countries_involved,
+            civilian_displacement_total,
+            journalist_casualties,
+            children_out_of_school,
+            ceasefire_attempts,
+            escalation_events,
+            humanitarian_access_incidents
         FROM daily_metrics
         WHERE date < ?
         ORDER BY date DESC
@@ -192,6 +232,12 @@ def get_previous_metrics(
             "usa_spending_usd": None,
             "schools_hospitals_destroyed": None,
             "countries_involved": None,
+            "civilian_displacement_total": None,
+            "journalist_casualties": None,
+            "children_out_of_school": None,
+            "ceasefire_attempts": None,
+            "escalation_events": None,
+            "humanitarian_access_incidents": None,
         }
 
     return dict(row)
@@ -493,6 +539,96 @@ def fetch_countries_involved(
     )
 
 
+def fetch_civilian_displacement_total(
+    conn: sqlite3.Connection,
+    client: OpenAI,
+    target_date: str,
+    previous_value: float | None,
+) -> MetricResult:
+    return call_openai_for_metric(
+        conn=conn,
+        client=client,
+        metric_name="civilian_displacement_total",
+        target_date=target_date,
+        previous_value=previous_value,
+    )
+
+
+def fetch_journalist_casualties(
+    conn: sqlite3.Connection,
+    client: OpenAI,
+    target_date: str,
+    previous_value: float | None,
+) -> MetricResult:
+    return call_openai_for_metric(
+        conn=conn,
+        client=client,
+        metric_name="journalist_casualties",
+        target_date=target_date,
+        previous_value=previous_value,
+    )
+
+
+def fetch_children_out_of_school(
+    conn: sqlite3.Connection,
+    client: OpenAI,
+    target_date: str,
+    previous_value: float | None,
+) -> MetricResult:
+    return call_openai_for_metric(
+        conn=conn,
+        client=client,
+        metric_name="children_out_of_school",
+        target_date=target_date,
+        previous_value=previous_value,
+    )
+
+
+def fetch_ceasefire_attempts(
+    conn: sqlite3.Connection,
+    client: OpenAI,
+    target_date: str,
+    previous_value: float | None,
+) -> MetricResult:
+    return call_openai_for_metric(
+        conn=conn,
+        client=client,
+        metric_name="ceasefire_attempts",
+        target_date=target_date,
+        previous_value=previous_value,
+    )
+
+
+def fetch_escalation_events(
+    conn: sqlite3.Connection,
+    client: OpenAI,
+    target_date: str,
+    previous_value: float | None,
+) -> MetricResult:
+    return call_openai_for_metric(
+        conn=conn,
+        client=client,
+        metric_name="escalation_events",
+        target_date=target_date,
+        previous_value=previous_value,
+    )
+
+
+def fetch_humanitarian_access_incidents(
+    conn: sqlite3.Connection,
+    client: OpenAI,
+    target_date: str,
+    previous_value: float | None,
+) -> MetricResult:
+    return call_openai_for_metric(
+        conn=conn,
+        client=client,
+        metric_name="humanitarian_access_incidents",
+        target_date=target_date,
+        previous_value=previous_value,
+    )
+
+
 def apply_monotonic_rule(new_value: float | None, previous_value: float | None) -> float | None:
     if new_value is None:
         return previous_value
@@ -587,10 +723,16 @@ def persist_daily_metrics(
             usa_spending_usd,
             schools_hospitals_destroyed,
             countries_involved,
+            civilian_displacement_total,
+            journalist_casualties,
+            children_out_of_school,
+            ceasefire_attempts,
+            escalation_events,
+            humanitarian_access_incidents,
             details_json,
             created_at,
             updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(date) DO UPDATE SET
             iranian_civilians_deaths = excluded.iranian_civilians_deaths,
             us_soldiers_deaths = excluded.us_soldiers_deaths,
@@ -599,6 +741,12 @@ def persist_daily_metrics(
             usa_spending_usd = excluded.usa_spending_usd,
             schools_hospitals_destroyed = excluded.schools_hospitals_destroyed,
             countries_involved = excluded.countries_involved,
+            civilian_displacement_total = excluded.civilian_displacement_total,
+            journalist_casualties = excluded.journalist_casualties,
+            children_out_of_school = excluded.children_out_of_school,
+            ceasefire_attempts = excluded.ceasefire_attempts,
+            escalation_events = excluded.escalation_events,
+            humanitarian_access_incidents = excluded.humanitarian_access_incidents,
             details_json = excluded.details_json,
             updated_at = excluded.updated_at
         """,
@@ -611,6 +759,12 @@ def persist_daily_metrics(
             values["usa_spending_usd"],
             values["schools_hospitals_destroyed"],
             values["countries_involved"],
+            values["civilian_displacement_total"],
+            values["journalist_casualties"],
+            values["children_out_of_school"],
+            values["ceasefire_attempts"],
+            values["escalation_events"],
+            values["humanitarian_access_incidents"],
             json.dumps(details),
             now,
             now,
@@ -657,6 +811,12 @@ def run_update(target_date: str, force: bool = False) -> None:
                 fetch_usa_spending_usd,
                 fetch_schools_hospitals_destroyed,
                 fetch_countries_involved,
+                fetch_civilian_displacement_total,
+                fetch_journalist_casualties,
+                fetch_children_out_of_school,
+                fetch_ceasefire_attempts,
+                fetch_escalation_events,
+                fetch_humanitarian_access_incidents,
             ]
 
             if len(fetchers) > MAX_REQUESTS:

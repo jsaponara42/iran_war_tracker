@@ -35,6 +35,12 @@ def initialize_schema(conn: sqlite3.Connection) -> None:
             usa_spending_usd REAL,
             schools_hospitals_destroyed REAL,
             countries_involved REAL,
+            civilian_displacement_total REAL,
+            journalist_casualties REAL,
+            children_out_of_school REAL,
+            ceasefire_attempts REAL,
+            escalation_events REAL,
+            humanitarian_access_incidents REAL,
             details_json TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
@@ -69,6 +75,12 @@ def initialize_schema(conn: sqlite3.Connection) -> None:
     required_columns: dict[str, str] = {
         "schools_hospitals_destroyed": "REAL",
         "countries_involved": "REAL",
+        "civilian_displacement_total": "REAL",
+        "journalist_casualties": "REAL",
+        "children_out_of_school": "REAL",
+        "ceasefire_attempts": "REAL",
+        "escalation_events": "REAL",
+        "humanitarian_access_incidents": "REAL",
     }
     for column_name, column_type in required_columns.items():
         if column_name not in existing_columns:
@@ -97,10 +109,16 @@ def seed() -> None:
                 usa_spending_usd,
                 schools_hospitals_destroyed,
                 countries_involved,
+                civilian_displacement_total,
+                journalist_casualties,
+                children_out_of_school,
+                ceasefire_attempts,
+                escalation_events,
+                humanitarian_access_incidents,
                 details_json,
                 created_at,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(date) DO NOTHING
             """,
             (
@@ -112,6 +130,12 @@ def seed() -> None:
                 2500000000,
                 210,
                 9,
+                180000,
+                27,
+                76000,
+                16,
+                42,
+                65,
                 '{"note":"Seed demo row for dashboard preview."}',
                 now,
                 now,
@@ -126,6 +150,12 @@ def seed() -> None:
             ("usa_spending_usd", "https://www.cbo.gov", "Congressional Budget Office", 0.95),
             ("schools_hospitals_destroyed", "https://www.unicef.org", "UNICEF", 0.9),
             ("countries_involved", "https://www.reuters.com", "Reuters", 0.9),
+            ("civilian_displacement_total", "https://www.unhcr.org", "UNHCR", 0.95),
+            ("journalist_casualties", "https://cpj.org", "Committee to Protect Journalists", 0.9),
+            ("children_out_of_school", "https://www.unicef.org", "UNICEF", 0.95),
+            ("ceasefire_attempts", "https://www.reuters.com", "Reuters", 0.9),
+            ("escalation_events", "https://www.reuters.com", "Reuters", 0.9),
+            ("humanitarian_access_incidents", "https://www.unocha.org", "UNOCHA", 0.95),
         ]
 
         for metric_name, source_url, source_title, trust_score in source_rows:
