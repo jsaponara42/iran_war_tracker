@@ -4,6 +4,17 @@ on:
   schedule:
     - cron: "15 6 * * *"
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Force update even if today's run already succeeded"
+        required: false
+        default: false
+        type: boolean
+      target_date:
+        description: "Optional target date (YYYY-MM-DD). Leave blank for today."
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: write
@@ -35,7 +46,16 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p logs
-          python updater.py 2>&1 | tee "logs/updater_${{ github.run_id }}.log"
+          UPDATE_ARGS=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ inputs.force }}" = "true" ]; then
+              UPDATE_ARGS="$UPDATE_ARGS --force"
+            fi
+            if [ -n "${{ inputs.target_date }}" ]; then
+              UPDATE_ARGS="$UPDATE_ARGS --date ${{ inputs.target_date }}"
+            fi
+          fi
+          python updater.py $UPDATE_ARGS 2>&1 | tee "logs/updater_${{ github.run_id }}.log"
 
       - name: Upload updater logs
         if: always()

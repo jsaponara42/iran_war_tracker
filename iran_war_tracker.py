@@ -97,6 +97,42 @@ def get_days_at_war(today: date) -> int:
 	return (today - WAR_START_DATE).days + 1
 
 
+def get_freshness_label(days: float | int | None) -> str:
+	if days is None or pd.isna(days):
+		return "unknown"
+	if days <= 1:
+		return "fresh"
+	if days <= 3:
+		return "recent"
+	if days <= 7:
+		return "aging"
+	return "stale"
+
+
+def add_source_freshness_columns(sources_df: pd.DataFrame, today: date) -> pd.DataFrame:
+	if sources_df.empty:
+		return sources_df
+
+	formatted_df = sources_df.copy()
+	last_seen_ts = pd.to_datetime(formatted_df["last_seen_date"], errors="coerce")
+	today_ts = pd.Timestamp(today)
+	formatted_df["source_freshness_days"] = (today_ts - last_seen_ts).dt.days
+	formatted_df["source_freshness"] = formatted_df["source_freshness_days"].apply(get_freshness_label)
+	formatted_df["last_seen_date"] = last_seen_ts.dt.strftime("%Y-%m-%d").fillna("unknown")
+	return formatted_df
+
+
+def render_header(today: date) -> None:
+	days_at_war = get_days_at_war(today)
+	top_cols = st.columns(2)
+	top_cols[0].metric("Days at War", f"{days_at_war}")
+	top_cols[1].caption(f"War start date: {WAR_START_DATE.isoformat()}")
+
+	with st.container(border=True):
+		st.subheader("Number of Hearts and Minds Won")
+		st.markdown("## 0")
+
+
 def render_latest_metrics(metrics_df: pd.DataFrame) -> None:
 	latest = metrics_df.iloc[-1]
 	st.subheader("Latest daily estimates")
@@ -137,13 +173,23 @@ def render_trend_charts(metrics_df: pd.DataFrame) -> None:
 
 def main() -> None:
 	st.set_page_config(page_title="Iran War Tracker", layout="wide")
+	st.markdown(
+		"""
+		<style>
+		div[data-testid="stMetric"] {
+			border: 1px solid color-mix(in srgb, var(--text-color) 15%, transparent);
+			border-radius: 10px;
+			padding: 0.6rem;
+			background: color-mix(in srgb, var(--background-color) 90%, var(--primary-color) 10%);
+		}
+		</style>
+		""",
+		unsafe_allow_html=True,
+	)
 	st.title("Iran War Tracker")
 
 	today = date.today()
-	days_at_war = get_days_at_war(today)
-	top_cols = st.columns(2)
-	top_cols[0].metric("Days at War", f"{days_at_war}")
-	top_cols[1].caption(f"War start date: {WAR_START_DATE.isoformat()}")
+	render_header(today)
 
 	st.caption(
 		"Public read-only dashboard. Data updates are performed by scheduled jobs, not by website users."
@@ -176,6 +222,7 @@ def main() -> None:
 		if sources_df.empty:
 			st.caption("No source history captured yet.")
 		else:
+			sources_df = add_source_freshness_columns(sources_df, today)
 			st.dataframe(sources_df, width="stretch")
 	except Exception as exc:
 		st.warning(f"Could not load source reputation table: {exc}")

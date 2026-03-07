@@ -273,8 +273,6 @@ def call_openai_for_metric(
     target_date: str,
     previous_value: float | None,
 ) -> MetricResult:
-    preferred_domains = get_preferred_domains(conn, metric_name)
-    preferred_domains_text = ", ".join(preferred_domains) if preferred_domains else "none"
     metric_hint = METRIC_SEARCH_HINTS.get(metric_name, "Use reputable same-day sources.")
 
     def fetch_payload(attempt: int) -> tuple[dict[str, Any], list[dict[str, str]], str]:
@@ -286,15 +284,14 @@ def call_openai_for_metric(
 You are collecting a single metric for a public war-tracking dataset.
 Metric name: {metric_name}
 Target date: {target_date}
-Preferred reputable domains from prior runs: {preferred_domains_text}
 Metric guidance: {metric_hint}
 Attempt context: {attempt_note}
 
 Requirements:
-1) Use web search and only accept sources published on {target_date}.
-2) If exact same-day data is unavailable, return value_number as null.
-3) Prioritize preferred reputable domains when relevant and available.
-4) Cross-check at least 2 same-day sources before finalizing a numeric estimate.
+1) Use web search and consider sources published on or before {target_date}.
+2) Prioritize recency and verification; do not over-prioritize historical trust ranking if newer verified data exists.
+3) Identify multiple plausible cumulative values and select the highest verifiable estimate.
+4) Cross-check at least 2 sources when available.
 5) Return only a JSON object with keys:
    - value_number (number or null)
    - confidence (low|medium|high)
@@ -353,11 +350,11 @@ Requirements:
         source_date=str(payload.get("source_date")) if payload.get("source_date") else None,
     )
 
-    if result.source_date != target_date:
+    if result.source_date and result.source_date > target_date:
         result.value = None
         result.rationale = (
-            f"Discarded non-same-day source ({result.source_date}). "
-            f"Required source date is {target_date}. "
+            f"Discarded future-dated source ({result.source_date}). "
+            f"Target date is {target_date}. "
             f"Original rationale: {result.rationale}"
         )
 
