@@ -354,7 +354,7 @@ def call_openai_for_metric(
         )
 
         prompt = f"""
-You are collecting a single metric for a public war-tracking dataset.
+You are collecting a single metric for a public war-tracking dataset. The war you are tracking is the US-Iran conflict that started on 2026-02-28.
 Metric name: {metric_name}
 Target date: {target_date}
 Metric guidance: {metric_hint}
@@ -372,7 +372,7 @@ Requirements:
    - source_title (string or null)
    - source_url (string or null)
    - source_date (YYYY-MM-DD or null)
-6) For cumulative metrics, values should NEVER decrease from the previous stored value.
+6) For cumulative metrics, values should not decrease from the previous stored values unless your previous data was clearly innacurate.
    Previous stored value: {previous_value}
 7) No markdown.
 """.strip()
