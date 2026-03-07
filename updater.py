@@ -38,7 +38,7 @@ METRIC_SEARCH_HINTS = {
         "Focus on same-day military casualty reporting from reputable news wires and official statements. This should be a total cumulative count of Iranian soldier deaths in relation to the conflict as of the target date."
     ),
     "usa_spending_usd": (
-        "Focus on cumulative U.S. spending and military spending estimates from official U.S. sources and trusted finance/government reporting estimates."
+        "Focus on cumulative U.S. spending and military spending estimates from official U.S. sources and trusted finance/government reporting estimates. This should be in the hundreds of millions, or billions. Write the number with all zeroes included, not as a decimal. For example, write 1500000000 instead of 1.5 billion."
     ),
     "schools_hospitals_destroyed": (
         "Focus on cumulative counts of schools and hospitals destroyed, damaged beyond use, or rendered non-operational."

@@ -2,7 +2,7 @@ name: Daily Iran War Update
 
 on:
   schedule:
-    - cron: "15 6 * * *"
+    - cron: "15 6 */3 * *"
   workflow_dispatch:
     inputs:
       force:
