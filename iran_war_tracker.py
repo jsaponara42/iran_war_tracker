@@ -311,19 +311,6 @@ def render_trend_charts(metrics_df: pd.DataFrame) -> None:
 	chart_df = chart_df[chart_columns].rename(columns=METRIC_COLUMNS)
 	st.line_chart(chart_df)
 
-	humanitarian_columns = [
-		"civilian_displacement_total",
-		"children_out_of_school",
-		"journalist_casualties",
-		"humanitarian_access_incidents",
-	]
-	humanitarian_df = metrics_df.copy()
-	humanitarian_df["date"] = pd.to_datetime(humanitarian_df["date"])
-	humanitarian_df = humanitarian_df.set_index("date")
-	humanitarian_df = humanitarian_df[humanitarian_columns].rename(columns=METRIC_COLUMNS)
-	st.subheader("📉 Humanitarian trendlines")
-	st.line_chart(humanitarian_df)
-
 
 def main() -> None:
 	st.set_page_config(page_title="Iran War Tracker", layout="wide")

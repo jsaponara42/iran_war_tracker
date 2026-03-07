@@ -372,7 +372,7 @@ Requirements:
    - source_title (string or null)
    - source_url (string or null)
    - source_date (YYYY-MM-DD or null)
-6) For cumulative metrics, values should not decrease over time.
+6) For cumulative metrics, values should NEVER decrease from the previous stored value.
    Previous stored value: {previous_value}
 7) No markdown.
 """.strip()
