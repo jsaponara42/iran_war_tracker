@@ -24,21 +24,21 @@ LOG_DIR = os.getenv("IRAN_WAR_LOG_DIR", "logs")
 
 METRIC_SEARCH_HINTS = {
     "iranian_civilians_deaths": (
-        "Focus on same-day casualty reports for Iranian civilians from reputable international wire services,"
+        "Focus on total casualty reports for Iranian civilians from reputable international wire services,"
         " official humanitarian updates, and major outlets with timestamped reporting."
     ),
     "us_soldiers_deaths": (
         "Focus on same-day reporting from U.S. Department of Defense announcements, major wire services,"
-        " and other official military/public briefings."
+        " and other official military/public briefings. This should be a total cumulative count of U.S. soldier deaths in relation to the conflict as of the target date."
     ),
     "us_allied_soldiers_deaths": (
-        "Focus on same-day reporting from allied defense ministries, NATO communications, and major wire services."
+        "Focus on same-day reporting from allied defense ministries, NATO communications, and major wire services. This should be a total cumulative count of allied soldier deaths (non-U.S.) in relation to the conflict as of the target date."
     ),
     "iranian_soldiers_deaths": (
-        "Focus on same-day military casualty reporting from reputable news wires and official statements."
+        "Focus on same-day military casualty reporting from reputable news wires and official statements. This should be a total cumulative count of Iranian soldier deaths in relation to the conflict as of the target date."
     ),
     "usa_spending_usd": (
-        "Focus on same-day reported cumulative U.S. spending estimates from official U.S. sources and trusted finance/government reporting."
+        "Focus on cumulative U.S. spending and military spending estimates from official U.S. sources and trusted finance/government reporting estimates."
     ),
     "schools_hospitals_destroyed": (
         "Focus on cumulative counts of schools and hospitals destroyed, damaged beyond use, or rendered non-operational."
@@ -372,7 +372,7 @@ Requirements:
    - source_title (string or null)
    - source_url (string or null)
    - source_date (YYYY-MM-DD or null)
-6) For cumulative metrics, values should not decrease from the previous stored values unless your previous data was clearly innacurate.
+6) For cumulative metrics, values should not decrease from the previous stored values unless your previous data was clearly inaccurate. Avoid returning lower numbers without strong evidence from multiple sources.
    Previous stored value: {previous_value}
 7) No markdown.
 """.strip()
