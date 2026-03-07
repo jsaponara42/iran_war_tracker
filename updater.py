@@ -41,50 +41,62 @@ METRIC_NAMES = [
 METRIC_SEARCH_HINTS = {
     "iranian_civilians_deaths": (
         "Focus on total casualty reports for Iranian civilians from reputable international wire services,"
-        " official humanitarian updates, and major outlets with timestamped reporting."
+        " official humanitarian updates, and major outlets with timestamped reporting. All metrics must be from the US-Iran conflict that began on 2026-02-28, not any other US conflict."
     ),
     "us_soldiers_deaths": (
         "Focus on same-day reporting from U.S. Department of Defense announcements, major wire services,"
         " and other official military/public briefings. This should be a total cumulative count of U.S. soldier deaths in relation to the conflict as of the target date."
+        "All metrics must be from the US-Iran conflict that began on 2026-02-28, not any other US conflict."
     ),
     "us_allied_soldiers_deaths": (
         "Focus on same-day reporting from allied defense ministries, NATO communications, and major wire services. This should be a total cumulative count of allied soldier deaths (non-U.S.) in relation to the conflict as of the target date."
+        "All metrics must be from the US-Iran conflict that began on 2026-02-28, not any other US conflict."
     ),
     "iranian_soldiers_deaths": (
         "Focus on same-day military casualty reporting from reputable news wires and official statements. This should be a total cumulative count of Iranian soldier deaths in relation to the conflict as of the target date."
+        "All metrics must be from the US-Iran conflict that began on 2026-02-28, not any other US conflict."
     ),
     "usa_spending_usd": (
         "Focus on cumulative U.S. spending and military spending estimates from official U.S. sources and trusted finance/government reporting estimates. This should be in the hundreds of millions, or billions. Write the number with all zeroes included, not as a decimal. For example, write 1500000000 instead of 1.5 billion."
+        "All metrics must be from the US-Iran conflict that began on 2026-02-28, not any other US conflict."
     ),
     "schools_hospitals_destroyed": (
         "Focus on cumulative counts of schools and hospitals destroyed, damaged beyond use, or rendered non-operational."
         " Prefer reputable humanitarian, UN, health, and education reporting plus major wire services."
+        "All metrics must be from the US-Iran conflict that began on 2026-02-28, not any other US conflict."
     ),
     "countries_involved": (
         "Focus on total number of countries directly involved (military, active combat, or direct operational support)."
         " Prefer clear lists from reputable reporting and official statements."
+        "All metrics must be from the US-Iran conflict that began on 2026-02-28, not any other US conflict."
     ),
     "civilian_displacement_total": (
         "Focus on total people displaced by the conflict to date."
         " Prioritize UN/OCHA/UNHCR and major wire reporting with clear cumulative estimates."
+        "All metrics must be from the US-Iran conflict that began on 2026-02-28, not any other US conflict."
     ),
     "journalist_casualties": (
         "Focus on total journalists killed or severely injured in relation to the conflict."
         " Prioritize press freedom organizations and major verified reporting."
+        "All metrics must be from the US-Iran conflict that began on 2026-02-28, not any other US conflict."
     ),
     "children_out_of_school": (
         "Focus on cumulative count of children whose schooling is disrupted or out of school due to conflict impacts."
         " Prioritize UNICEF/UNESCO/education cluster and major verified reporting."
+        "All metrics must be from the US-Iran conflict that began on 2026-02-28, not any other US conflict."
     ),
     "ceasefire_attempts": (
         "Focus on total count of documented ceasefire proposals, talks, or formal attempts to date."
+        "All metrics must be from the US-Iran conflict that began on 2026-02-28, not any other US conflict."
     ),
     "escalation_events": (
         "Focus on cumulative count of major escalation events (major strikes, new offensives, notable expansion in military scope)."
+        "All metrics must be from the US-Iran conflict that began on 2026-02-28, not any other US conflict."
     ),
     "humanitarian_access_incidents": (
         "Focus on cumulative count of reported humanitarian access denials/incidents."
         " Prioritize OCHA/aid organizations and major verified reporting."
+        "All metrics must be from the US-Iran conflict that began on 2026-02-28, not any other US conflict."
     ),
 }
 
