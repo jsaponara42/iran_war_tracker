@@ -1,4 +1,4 @@
-name: Daily Iran War Update
+name: Manual Iran War Update
 
 on:
   workflow_dispatch:
