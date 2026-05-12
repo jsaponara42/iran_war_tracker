@@ -56,8 +56,8 @@ All tracked values are treated as cumulative and are forced not to decrease vers
 ## Files
 
 - `iran_war_tracker.py` — Streamlit dashboard (latest KPIs, trends, source table, run history)
-- `updater.py` — scheduled updater, OpenAI calls, SQLite writes, reputation tracking
-- `.github/workflows/daily_update.yml` — runs updater once/day and can commit DB updates
+- `updater.py` — updater logic, OpenAI calls, SQLite writes, reputation tracking
+- `.github/workflows/daily_update.yml` — manual updater workflow that can commit DB updates
 - `requirements.txt` — Python dependencies
 
 ## Setup
@@ -110,7 +110,7 @@ python seed_data.py
 streamlit run iran_war_tracker.py
 ```
 
-## GitHub Actions schedule
+## GitHub Actions
 
 Workflow file already included at `.github/workflows/daily_update.yml`.
 
@@ -118,7 +118,7 @@ Required repo secret:
 
 - `OPENAI_API_KEY`
 
-The workflow runs daily and can commit `data/iran_war_tracker.db` changes back to `main`.
+The workflow runs manually via **Run workflow** (`workflow_dispatch`) and can commit `data/iran_war_tracker.db` changes back to `main`.
 
 ## Debug logging
 
